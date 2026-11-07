@@ -6,6 +6,38 @@
 
 Run calculations locally. Ask Claude, Codex, Gemini or Copilot to help define hypotheses and interpret compact results. No AI subscription, API key, GPU or market-data credentials are needed for the synthetic demonstration.
 
+## About this project
+
+Indian Quant is an open-source, CPU-first quantitative research foundation for Indian equities, built around Microsoft Qlib. It helps users turn a prepared daily-price dataset into reproducible factor experiments, baseline model comparisons, hypothetical portfolios and understandable research reports.
+
+The project is intended for traders moving toward systematic research, students learning quantitative methods, and developers building transparent local or VPS research workflows. Its first release focuses on daily cash-equity studies with a complete fixed universe. No GPU or AI API is required for the supplied research pipeline.
+
+### What you can use it for
+
+- **Create traceable research inputs:** validate CSV/Parquet bars, retain source snapshots and provenance, and produce canonical Parquet datasets with checksums.
+- **Use a genuine Qlib workflow:** build a derived binary cache and evaluate Qlib expressions for momentum, volatility, range and volume-based features.
+- **Compare simple models before adding complexity:** evaluate a momentum baseline, scaled Ridge regression and a small CPU LightGBM model using chronological training, validation and test segments.
+- **Reduce common evaluation mistakes:** fit preprocessing on training data, remove labels that overlap the next evaluation segment, and select the model using validation rather than test results.
+- **Simulate a portfolio:** feed the selected model's scores into a daily long-only Qlib top-k strategy with next-session-open execution and configurable proportional cost assumptions.
+- **Review results and reproducibility:** inspect prediction and portfolio files, model comparisons, performance explanations, resource usage and manifests recording data hashes and software versions.
+- **Investigate historical membership:** audit a user-supplied NiftyHistory file for count and transition discrepancies before attempting broader point-in-time research.
+
+### Resource-aware research with optional AI coaching
+
+The four profiles—`essential`, `guided`, `lab` and `vps`—offer explicit worker, input-size and research-runtime budgets. RAM recommendations remain advisory. Computation stays in Python, while optional Claude, ChatGPT/Codex, Gemini or Copilot guidance can help define hypotheses, explain assumptions and interpret results.
+
+The generated `brief.json` gives an assistant a compact starting point without uploading the full market history. The package makes no AI API calls and does not meter an external assistant's token use. Local/VPS access depends on the authorized capabilities of the AI client.
+
+### How it relates to Indian Trader Skill
+
+Use **Indian Quant** when the main question concerns factors, predictive models, stock rankings or simulated portfolio behaviour. Use **[Indian Trader Skill](https://github.com/maheshwaripn/Indian_Trader_skill)** for guided strategy formulation, reference trading-rule studies, data workflows and manual paper accounting. The repositories are independently installable companions; research predictions are not automatically converted into broker orders.
+
+### What the first release does not establish
+
+Successful runs demonstrate that the research pipeline works, not that a strategy has a durable market edge. Synthetic examples are software demonstrations. Real-data studies still depend on source quality, corporate-action treatment, universe selection and execution assumptions.
+
+The current pipeline uses one chronological holdout, not a walk-forward engine. Membership auditing is not yet integrated into portfolio eligibility, so it does not produce survivorship-free Nifty 500 backtests. Dated Indian fees/taxes, price-band enforcement, liquidity impact, broker adapters, automatic paper fills, live execution and options research remain later stages. The detailed scope and acceptance gates are documented below and in the roadmap.
+
 ## Start here
 
 Ubuntu/Linux with Python 3.11 or 3.12 is the first supported target. Qlib has a substantial scientific-Python dependency tree; installation needs internet and disk space even though research can subsequently run offline.
