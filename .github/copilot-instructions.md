@@ -1,0 +1,1 @@
+Follow AGENTS.md at the repository root. Load only the relevant skills/*/SKILL.md. Preserve data provenance and train/test separation. Read brief.json before full artifacts. Keep implemented capabilities separate from roadmap items. No live broker execution exists.

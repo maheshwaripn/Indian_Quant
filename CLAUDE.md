@@ -1,0 +1,1 @@
+Read AGENTS.md, then the task-relevant skill under skills/. Start with brief.json for completed research. Python does computation; explain assumptions and limitations. No live execution is implemented.
