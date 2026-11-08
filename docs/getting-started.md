@@ -25,7 +25,7 @@ indian-quant modes
 indian-quant demo --workspace workspace --mode essential
 ```
 
-The program creates 12 fictional stocks plus a fictional benchmark across 420 weekday sessions. This calendar is not an NSE calendar. It writes Qlib's binary cache, computes five expressions, trains baseline models, selects using validation, and executes a Qlib portfolio simulation. No data download or model API call is performed.
+The program creates 12 fictional stocks plus a fictional benchmark across 420 weekday sessions. This calendar is not an NSE calendar. It writes Qlib's binary cache, computes five expressions, trains baseline models, selects using validation, and executes the local portfolio ledger. No data download or model API call is performed.
 
 Each invocation writes a new run directory. Open `report.html` from the printed path. If accessing a remote machine, use the private report instructions in [VPS operation](vps.md).
 
@@ -35,7 +35,7 @@ Each invocation writes a new run directory. Open `report.html` from the printed 
 2. Read `manifest.json`: status, dataset hash, model choice, split boundaries, assumptions and limitations.
 3. Open `report.html`: equity, metrics, model comparison and reading guidance.
 4. Inspect `predictions.csv`: test-period features, labels and chosen-model scores.
-5. Inspect `portfolio.csv`: Qlib's daily portfolio valuation, costs, benchmark and turnover.
+5. Inspect `portfolio.csv`: the local daily portfolio valuation, costs, benchmark and turnover.
 
 A successful run has `status: completed`. A failed/timeout run is not a completed experiment even if some files exist. Do not compare demo returns as if they were evidence of an Indian market edge.
 
@@ -52,9 +52,9 @@ The integration test uses Qlib itself, not a mock backtester. If the demo fails,
 
 ## 6. Move to a small real-data pilot
 
-Prepare a complete dataset for a few equities and a benchmark, following [the contract](data-contract.md). Supply an independently checked session calendar. Start with a deliberately limited period and inspect adjusted/raw prices around corporate actions. Import into the bank with provenance, then point `run` at its canonical `bars.parquet`.
+Prepare validated histories for a few equities and a complete benchmark, following [the contract](data-contract.md). Supply an independently checked session calendar. Start with a deliberately limited period and inspect adjusted/raw prices around corporate actions. Import into the bank with provenance, then point `run` at its canonical `bars.parquet`.
 
-Use the same pilot cohort over the chosen period only for software/research exploration. Choosing today's survivors retrospectively introduces bias. Keep the fixed-universe warning visible until the future historical-universe engine is implemented and verified.
+Use the same pilot cohort over the chosen period only for software/research exploration. Choosing today's survivors retrospectively introduces bias. Supply reconciled dated membership to enable historical eligibility; missing delisted data still introduces bias.
 
 ## Troubleshooting
 

@@ -44,7 +44,7 @@ Expected columns: `effective_date,index_type,inclusions,exclusions,symbols`. Sym
 
 The user-supplied history previously reviewed spans 1998-01-08 to 2026-09-30 despite its wider filename range. It contained membership-count and transition discrepancies. Audit your copy rather than treating the filename or a previous audit as authoritative. No raw history is redistributed here because redistribution permission has not been established.
 
-Do not silently repair BBOX/BLACKBOX or similar aliases. Resolve identities using authoritative evidence and preserve a correction ledger. A no-issue audit means only that these structural checks passed; it does not prove complete PIT accuracy, publication timing, or delisted price coverage. The current portfolio recipe does not consume these snapshots.
+Do not silently repair BBOX/BLACKBOX or similar aliases. Resolve identities using authoritative evidence and preserve a correction ledger. A no-issue audit means only that these structural checks passed; it does not prove complete PIT accuracy, publication timing, or delisted price coverage. Research can consume clean snapshots with explicit knowledge assumptions; see review-upgrade.md.
 
 ## Maintenance checklist
 

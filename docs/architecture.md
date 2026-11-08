@@ -9,7 +9,7 @@ flowchart TD
     C --> D[Derived Qlib cache]
     D --> E[Features and purged chronological split]
     E --> F[Baseline model comparison]
-    F --> G[Qlib portfolio simulation]
+    F --> G[Local portfolio ledger]
     G --> H[Report and compact research brief]
     I[Optional AI coach] --> E
     H --> I
@@ -19,7 +19,7 @@ flowchart TD
 
 - `data.py`: contract validation, content-addressed snapshots, synthetic fixtures and binary writer.
 - `resources.py`: profiles and thread limits.
-- `research.py`: expressions, chronological split, models, selection, Qlib simulation and manifest.
+- `research.py`: expressions, chronological split, models, selection and manifest; execution.py owns local portfolio accounting.
 - `report.py`: escaped standalone HTML with an inline equity chart and interpretation.
 - `membership.py`: NiftyHistory structural audit, independent of the portfolio.
 - `cli.py`: user commands, isolated research subprocess and timeout.
@@ -34,6 +34,6 @@ Do not import private modules from the companion repository or duplicate a broke
 
 ## Future boundaries
 
-Provider adapters return normalized observations and provenance. A PIT universe service returns eligibility at information time. A cost/exchange service returns dated instrument-specific rules. A paper/live execution service consumes validated intents and owns order lifecycle/reconciliation. These are planned interfaces, not implemented services.
+Provider adapters return normalized observations and provenance. A PIT universe service returns eligibility at information time. A cost/exchange service returns dated instrument-specific rules. A paper/live execution service consumes validated intents and owns order lifecycle/reconciliation. Shared indian_market_core now supplies bounded fees, calendar and bhavcopy parsing; live/paper services remain planned.
 
-The first release intentionally rejects incomplete pilot panels. A future dynamic-universe engine must handle listing, removal, re-entry, halts, delistings and unavailable prices without silently dropping held positions from P&L.
+Sparse panels are supported. Missing held quotes remain marked and visible; terminal settlement must be supplied or explicitly written off. See review-upgrade.md for execution semantics.

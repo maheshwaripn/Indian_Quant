@@ -1,17 +1,15 @@
-# Release validation record
+# Review validation record — 0.2
 
-Initial local validation on Linux / Python 3.12:
+Local Linux/Python 3.12 checks on 2026-11-08:
 
-- 17 tests passed, including a real Qlib end-to-end run and an independent next-open label calculation.
-- Essential and guided mode synthetic demonstrations completed (one and two workers).
-- Ruff, dependency consistency and relative documentation links passed.
-- The supplied NiftyHistory file produced 137 audited rows, 49 count warnings and 114 transition mismatches; raw data remains private and is not committed.
-- A read-only research-coaching exercise correctly identified adjusted-close-only inputs, current-constituent bias, repeated Sharpe optimization and absent live Dhan execution as limitations.
+- Original 17 tests passed before the extension.
+- The expanded suite covers actual Qlib demo execution; missing/delisted-like history; zero-volume non-tradable benchmarks; stale holdings and explicit writeoffs; final-sale charges; weekly turnover limits; Nifty 50 cardinality and removal/re-entry intervals; missing-label eligibility; long-horizon purging; reproducible uncertainty diagnostics; and India fee accounting.
+- Separate subprocess integration cases exercise Alpha158 with undefined constant-volume correlations and a multi-year walk-forward run. The latter verifies that no returns or predictions enter the closed final year.
+- The first extended walk-forward check exposed a year-boundary label crossing; it was corrected before publication and is covered by the regression test. Alpha158 missing-feature handling is fitted on training data.
+- CLI docs, Ruff, package dependency consistency and the synthetic demo are checked. The shared Trader wheel was inspected for its calendar resource.
 
-These are software checks, not market-performance validation. Synthetic returns are not an investment result. There has been no real-data strategy evaluation, broker integration, live-order test, historical-universe portfolio test, regulatory certification or capacity study.
+These are software/accounting checks, not market-performance validation. There has been no real-data alpha evaluation, calibrated impact study, authoritative historical-universe reconciliation, authenticated broker test or live execution. The original user-supplied NiftyHistory file's 137 rows included 49 count warnings and 114 transition conflicts; it remains private and unresolved, not silently repaired.
 
-Qlib emits upstream deprecation warnings and empty-slice warnings in optional execution indicators during the demonstration. The portfolio return, cost, turnover and prediction artifacts are checked; unavailable indicator statistics are not promoted into the report.
+Qlib 0.9.7 emits upstream pandas/NumPy deprecation warnings. CI targets Ubuntu Python 3.11/3.12; no CPython 3.13 wheel was available for the pinned Qlib release when checked. Native Quant Windows/macOS installation is not certified. Reports are generated as escaped standalone HTML with local SVGs; no claim of browser/viewport visual certification is made.
 
-Automated browser preview was unavailable in the build environment because Chromium could not open its required local socket. HTML generation and artifact content were checked, but this is not a claim of visual browser certification. Users should open the offline report and report layout problems with their browser/viewport.
-
-CI runs the same tests on Ubuntu Python 3.11 and 3.12. Check the linked GitHub Actions run rather than assuming a badge or this document proves the latest commit passed. Native Windows/macOS are not certified.
+Check [GitHub Actions](https://github.com/maheshwaripn/Indian_Quant/actions) for the exact commit's result. A historical validation note is not evidence that a later revision passes. Only `status: completed` manifests represent completed runs; preserve failed/partial runs for the trial record.

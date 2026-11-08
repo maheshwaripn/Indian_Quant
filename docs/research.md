@@ -16,39 +16,26 @@ Example idea: “Buy strong Nifty 500 momentum stocks.” Before computation, re
 
 Offer the user defaults, alternatives and explanations. A skipped recommendation remains a visible limitation. Do not invent capital, risk tolerance, data coverage or missing strategy rules. Read `skills/quant-research/SKILL.md` when using an assistant.
 
-## What the executable recipe does
+## Executable protocol
 
-Five Qlib expressions describe 5/20-session momentum, 20-session volatility, daily range and volume ratio. After a 20-session warmup, the recipe predicts `open[t+2]/open[t+1]-1` using information available through close t.
+Choose `--horizon 1|5|20`: label is `open[t+horizon+1]/open[t+1]-1`. Features use information through close t. Undefined Alpha158 correlations are retained as missing: Ridge uses a training-fitted median imputer (zero for wholly missing training columns); LightGBM handles missing values natively. Compact features need 20-session warmup; `--feature-set alpha158` uses Qlib's CPU expressions and 60-session warmup. Future label availability never determines which feature-complete stocks can receive predictions. Missing labels reduce IC coverage and are reported.
 
-The calendar splits at 60% and 80%. Training rows whose label endpoint touches validation are removed; validation rows whose label endpoint touches test are removed. Ridge scaling is fitted only on training data. LightGBM uses fixed modest settings. The momentum score is the rules-based baseline. No hyperparameter grid or AI factor search runs.
+Holdout splits at 60% and 80%; label endpoints must be strictly before the next segment. Walk-forward uses rolling training years, separate validation years, then one test calendar year. Retraining and validation-only selection repeat annually. The label horizon supplies the purge gap. Last available year remains closed unless `--open-final`; this is a workflow guard, not access control over the source file. Partial first/last calendar years are possible: inspect fold coverage. Require enough history for every fold.
 
-Choose the model with the greatest mean daily validation rank IC. Report all three test rank ICs for transparency, but do not reselect using them. The chosen model's test signals feed Qlib's top-k dropout strategy. Orders use the next session's open; the account is valued at daily close. Rank scores are not return promises. A one-day label guides selection, while portfolio holdings can persist across days.
+Ridge scaling is fitted on each training fold. Fixed LightGBM settings and momentum are compared on validation rank IC. Test scores are disclosed for every candidate but never used to choose a model. `protocol.json` records settings before fitting. Preserve every run directory, including failures; failed runs are trials too. Record ideas and all external experiments in your research log. A file cannot prevent a human from repeatedly tuning on disclosed results.
 
-The strategy uses a 0.95 deployment setting when constructing purchases, not a guaranteed continuous 95% exposure cap. Price movement and Qlib's rebalance mechanics can change actual exposure. Positions are not liquidated at the final close; the report states this explicitly.
+## Portfolio accounting
 
-## Costs and execution limits
+Qlib computes features; `execution.py` is a separate transparent ledger, not Qlib's exchange simulator. Signals from the immediately preceding session execute at the next open. Fractional adjusted units avoid pretending to model historical raw-share rounding. Set `--rebalance daily|weekly|monthly`; weekly means first available simulation session in each Monday–Sunday week, monthly the first in each month. A mid-period test starts with an initial allocation. A hold buffer retains existing names within top-k plus the buffer. Target deployment is 95%; prices, stale holdings and partial fills change actual exposure.
 
-`--buy-cost` and `--sell-cost` are decimal proportional all-in assumptions, e.g. 0.001 means 0.1%. They are not a verified Indian statutory schedule. Costs are charged through Qlib. The defaults are demonstration assumptions, not recommended live-trading estimates.
+`--turnover-limit` caps ordinary daily gross traded value / opening equity. `--min-turnover` filters prior 20-session average turnover; `--participation` caps each fill against that lagged average, not future same-day volume. `--impact-bps` multiplies the square root of order value / lagged average turnover. These are research assumptions, not calibrated execution forecasts. Zero-volume or missing quotes cannot fill. Removal from membership schedules liquidation at an available quote subject to the same limits. Missing prices retain stale marks; last-known prices are never treated as hindsight delisting settlements.
 
-The simulator does not model instrument-specific historical price bands, order-book depth, market impact, borrow, futures margin, option assignment or liquidity participation. Positive bar volume does not prove fillability. Treat results as a preliminary hypothetical study. Test higher costs and smaller capacity before making any practical interpretation.
+Final close sells include fees and impact and may exceed the ordinary turnover cap; they must satisfy the liquidity cap. Missing/unfillable final holdings either fail (default) or are explicitly written off with `--terminal-policy writeoff`. The latter is a conservative scenario, not a recovered delisting payoff. Final close auction fillability is not verified.
 
-## Avoid learning the test set
+## Evidence and costs
 
-Save every attempted hypothesis and parameter choice, including failures. Repeatedly looking at a test period and revising the strategy turns that period into training evidence. Reserve a new untouched period or use a formally designed walk-forward study. This release has one holdout, not a walk-forward engine or multiple-testing correction.
+Use [the step-by-step upgrade guide](review-upgrade.md). India fees come from the same implementation as Trader. The supported date interval is deliberately bounded; choose explicit proportional assumptions for older history and disclose them. Hypothetical stress scales fees and impact, including statutory amounts, to measure sensitivity; this differs from Trader's brokerage-plus-slippage stress convention.
 
-Useful next experiments, each separately justified:
+Read net return beside its moving-block interval and the shuffled-score comparison. Cross-sectional shuffling preserves each day's score distribution, features and market returns; it tests ranking association conditional on this dataset, not all possible luck. The three-model check is a block sign-flip max HAC-t of IC, conditional on sign symmetry. It does not correct undisclosed trials, horizons or feature experiments. Few null draws are coarse: 19 cannot report p below 0.05. Increase the predeclared budget, not only after a promising result.
 
-1. Compare against a simple equal-weight or momentum benchmark.
-2. Perturb one parameter at a time to inspect stability.
-3. Stress costs and delayed execution.
-4. Compare market regimes, sectors and liquidity groups.
-5. Study whether performance depends on a handful of names/dates.
-6. Use historical membership and delisted data before claiming broad Nifty 500 evidence.
-
-A poor recent period is not automatic evidence that the strategy should be retrained or its rules changed. Investigate data issues, implementation differences, random variation, changing liquidity and regime dependence first.
-
-## Evidence ladder
-
-Synthetic integration → audited real-data exploration → untouched evaluation → robustness and capacity checks → paper observation → separately authorized execution pilot.
-
-The current code supports the first two steps and a simple chronological holdout. It does not automatically promote a strategy or place orders.
+Synthetic prices contain no designed alpha: a high Sharpe does not become success because the code ran. Equal-weight uses all eligible tradable names meeting the liquidity filter with identical execution/cost assumptions. Decile returns are gross label diagnostics, not tradeable portfolio returns. Short samples, concentration, missing delisted history and unstable regimes can invalidate apparent results. Never automatically promote to paper/live trading.

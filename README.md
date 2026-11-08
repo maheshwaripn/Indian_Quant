@@ -10,7 +10,7 @@ Run calculations locally. Ask Claude, Codex, Gemini or Copilot to help define hy
 
 Indian Quant is an open-source, CPU-first quantitative research foundation for Indian equities, built around Microsoft Qlib. It helps users turn a prepared daily-price dataset into reproducible factor experiments, baseline model comparisons, hypothetical portfolios and understandable research reports.
 
-The project is intended for traders moving toward systematic research, students learning quantitative methods, and developers building transparent local or VPS research workflows. Its first release focuses on daily cash-equity studies with a complete fixed universe. No GPU or AI API is required for the supplied research pipeline.
+The project is intended for traders moving toward systematic research, students learning quantitative methods, and developers building transparent local or VPS research workflows. Version 0.2 supports daily cash-equity studies with sparse histories and optional dated membership. No GPU or AI API is required for the supplied research pipeline.
 
 ### What you can use it for
 
@@ -18,7 +18,7 @@ The project is intended for traders moving toward systematic research, students 
 - **Use a genuine Qlib workflow:** build a derived binary cache and evaluate Qlib expressions for momentum, volatility, range and volume-based features.
 - **Compare simple models before adding complexity:** evaluate a momentum baseline, scaled Ridge regression and a small CPU LightGBM model using chronological training, validation and test segments.
 - **Reduce common evaluation mistakes:** fit preprocessing on training data, remove labels that overlap the next evaluation segment, and select the model using validation rather than test results.
-- **Simulate a portfolio:** feed the selected model's scores into a daily long-only Qlib top-k strategy with next-session-open execution and configurable proportional cost assumptions.
+- **Simulate a portfolio:** feed the selected model's scores into a local long-only accounting ledger with next-session-open execution, final liquidation, and configurable India delivery or proportional costs. Qlib supplies the features; this ledger is not Qlib's simulator.
 - **Review results and reproducibility:** inspect prediction and portfolio files, model comparisons, performance explanations, resource usage and manifests recording data hashes and software versions.
 - **Investigate historical membership:** audit a user-supplied NiftyHistory file for count and transition discrepancies before attempting broader point-in-time research.
 
@@ -36,7 +36,7 @@ Use **Indian Quant** when the main question concerns factors, predictive models,
 
 Successful runs demonstrate that the research pipeline works, not that a strategy has a durable market edge. Synthetic examples are software demonstrations. Real-data studies still depend on source quality, corporate-action treatment, universe selection and execution assumptions.
 
-The current pipeline uses one chronological holdout, not a walk-forward engine. Membership auditing is not yet integrated into portfolio eligibility, so it does not produce survivorship-free Nifty 500 backtests. Dated Indian fees/taxes, price-band enforcement, liquidity impact, broker adapters, automatic paper fills, live execution and options research remain later stages. The detailed scope and acceptance gates are documented below and in the roadmap.
+The pipeline offers chronological holdout or yearly walk-forward evaluation, historical membership intervals, uncertainty diagnostics, liquidity constraints and shared Indian cost estimates. It does not make incomplete historical data survivorship-free. Missing settlements, corporate actions, price bands and broker fillability remain material research limitations. See [the review implementation guide](docs/review-upgrade.md).
 
 ## Start here
 
@@ -56,21 +56,17 @@ Open the printed `workspace/runs/demo-.../report.html` path in your browser. Rea
 
 Start with [the complete tutorial](docs/getting-started.md), then [choose data](docs/data-bank.md) and [read reports](docs/reporting.md).
 
-## What v0.1 actually does
+## What v0.2 implements
 
-- Validates daily CSV/Parquet bars, stores source snapshots by SHA256, and creates canonical Parquet plus provenance manifests.
-- Writes a derived Qlib binary cache and loads real Qlib factor expressions.
-- Compares momentum, scaled Ridge and a small CPU LightGBM model using chronological train/validation/test segments with label-boundary purging.
-- Selects a model on validation rank IC; runs Qlib's daily top-k long-only portfolio simulation using next-session open prices.
-- Produces predictions, portfolio records, a reproducibility manifest, a standalone HTML report and a small AI-readable brief.
-- Offers four resource profiles and a NiftyHistory membership audit command.
-- Supplies portable AI instructions, research coaching and detailed operating guides.
+- Immutable data snapshots, sparse per-stock Qlib caches, dated membership including removals and re-entry.
+- Compact or Alpha158 CPU features; 1-, 5- or 20-session labels; train-only scaling and horizon-aware purging.
+- Holdout or annual walk-forward model selection; final walk-forward year closed by default.
+- A local fractional adjusted-unit ledger: daily/weekly/monthly rebalancing, hold buffer, turnover limits, trailing liquidity filters and illustrative square-root impact.
+- Shared Indian delivery charges, UDiFF conversion and a bounded 2026 calendar from `indian_market_core`, distributed with Trader and pinned to a specific commit.
+- Final sales including costs, explicit handling of stale holdings, equal-weight baseline, bootstrap return intervals, shuffled-score simulations, HAC IC t-statistics, three-model resampling check and cost stress.
+- Light standalone reports, yearly returns, IC/decile CSVs, exposure, fills, reproducibility manifests and compact AI briefs.
 
-## Deliberate first-release boundaries
-
-This is a **research foundation**, not a production trading bot or a complete institutional platform. The pilot uses a complete fixed universe: it does **not** claim survivorship-free portfolios. The NiftyHistory audit is not yet connected to portfolio eligibility. Costs are configurable constant assumptions; there is no dated Indian fee/tax engine, circuit-band enforcement, order-book simulation or impact model. There is one chronological holdout, not walk-forward evaluation.
-
-No live orders, broker SDK integrations, automatic paper fills, autonomous model tuning, options research, hosted dashboard or AI API calls are implemented. See [roadmap and acceptance gates](docs/roadmap.md).
+No broker orders, automated paper fills, options engine, corporate-action repair or certified investability are provided. Resource modes cap workers and runtime, not every allocation of RAM. [Remaining work](docs/roadmap.md) is explicitly separated from tested functionality.
 
 ## Four resource modes
 
@@ -92,7 +88,7 @@ indian-quant run --data /path/bars.csv --calendar /path/sessions.txt \
   --benchmark NIFTY50 --output workspace/runs/my-first-study --mode guided
 ```
 
-Required columns: `date,symbol,open,high,low,close,volume,factor`. Do not rename a raw vendor export and assume it is compatible. Follow the [data contract](docs/data-contract.md), including adjustment factors, benchmark volume convention and verified calendar requirements. Outputs must go to a new directory.
+Required columns: `date,symbol,open,high,low,close,volume,factor`. Do not rename a raw vendor export and assume it is compatible. Follow the [data contract](docs/data-contract.md), including adjustment factors, non-tradable benchmark handling and verified calendar requirements. Outputs must go to a new directory.
 
 ## Use with an AI assistant
 
@@ -123,4 +119,4 @@ Browser chat alone cannot access your machine merely from a repository URL. See 
 
 Educational and research use only; not personalized investment advice. You own your decisions, capital, data permissions and deployment risk. Backtests are hypothetical and cannot guarantee returns. Users may configure research risk assumptions, but this repository does not override broker, exchange, legal or AI-provider requirements.
 
-Code: [MIT licence](LICENSE). Qlib is an upstream dependency with its own licence. No proprietary exchange data, broker credentials or NiftyHistory raw history is distributed. [Indian_Trader_skill](https://github.com/maheshwaripn/Indian_Trader_skill) is the companion workflow project; this package installs independently.
+Code: [MIT licence](LICENSE). Qlib is an upstream dependency with its own licence. No proprietary exchange data, broker credentials or NiftyHistory raw history is distributed. [Indian_Trader_skill](https://github.com/maheshwaripn/Indian_Trader_skill) is the companion workflow project; installation fetches a pinned companion distribution for the shared dependency-free market utilities; it does not run Trader commands.

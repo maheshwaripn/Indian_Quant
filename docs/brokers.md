@@ -1,6 +1,6 @@
 # Broker data, paper workflows and eventual live execution
 
-**Status: readiness guidance only.** v0.1 has no broker adapter, authenticated request command, paper-fill engine or live order path. Its Qlib simulation is not broker paper trading. Dhan is the planned first adapter; Zerodha follows after a shared interface is validated.
+**Status: readiness guidance only.** v0.1 has no broker adapter, authenticated request command, paper-fill engine or live order path. Its local portfolio simulation is not broker paper trading. Dhan is the planned first adapter; Zerodha follows after a shared interface is validated.
 
 ## Data-only setup
 

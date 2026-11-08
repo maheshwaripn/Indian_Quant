@@ -2,7 +2,7 @@
 name: quant-research
 description: Turn a trading or factor idea into an explicit Indian Quant research specification, evaluate missing assumptions, and run bounded experiments.
 ---
-Read ../../docs/research.md and ../../docs/roadmap.md. Distinguish implemented research from future PIT, walk-forward and execution features.
+Read ../../docs/research.md and ../../docs/roadmap.md. Distinguish implemented research from implemented membership/walk-forward features and remaining execution limitations.
 
 Create a research card covering hypothesis, universe, source/availability, signal time, later execution time, horizon/exits, portfolio sizing, costs/liquidity, baseline, validation, trial budget and failure criteria. Explain each missing choice and offer defaults, customization or a recorded skip. Never invent a user's risk preference or claim a skipped check passed.
 

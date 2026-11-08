@@ -10,7 +10,7 @@ Sharpe uses zero risk-free return and daily standard deviation. It does not capt
 
 The benchmark is whatever series you supplied. A price index excludes reinvested dividends; comparing it to a dividend-adjusted strategy can be unfair. The benchmark is close-to-close while the strategy begins at its first trading open. Explain this first-day difference when comparing short studies.
 
-Mean turnover describes trading intensity. Summed daily cost ratios are a descriptive total, not an exact rupee cost; `portfolio.csv` includes Qlib's cumulative `total_cost` column for that purpose. The equity curve retains final positions at marked value, so hypothetical liquidation costs are not included.
+Mean turnover describes gross trading intensity. Daily fees and impact are currency values in portfolio.csv; final close sales include their costs. Read uncertainty, yearly returns and baseline results alongside headline performance. See [the operating guide](review-upgrade.md).
 
 ## Factor and model evidence
 

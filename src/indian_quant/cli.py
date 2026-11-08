@@ -12,6 +12,29 @@ from pathlib import Path
 
 from .resources import PROFILES, configure, describe
 
+EXTRA = (
+    "membership",
+    "index",
+    "expected_size",
+    "assume_membership_known",
+    "rebalance",
+    "hold_buffer",
+    "turnover_limit",
+    "min_turnover",
+    "participation",
+    "impact_bps",
+    "terminal_policy",
+    "horizon",
+    "feature_set",
+    "evaluation",
+    "train_years",
+    "valid_years",
+    "open_final",
+    "null_draws",
+    "cost_model",
+    "broker",
+)
+
 
 def parser():
     p = argparse.ArgumentParser(description="Indian Quant: educational CPU-first research")
@@ -32,6 +55,26 @@ def parser():
     run.add_argument("--sell-cost", type=float, default=0.0015)
     run.add_argument("--topk", type=int, default=5)
     run.add_argument("--capital", type=float, default=1_000_000)
+    run.add_argument("--cost-model", choices=["proportional", "india"], default="proportional")
+    run.add_argument("--broker", choices=["zero", "flat20", "discount"], default="zero")
+    run.add_argument("--membership", type=Path)
+    run.add_argument("--index", default="Nifty500")
+    run.add_argument("--expected-size", type=int)
+    run.add_argument("--assume-membership-known", action="store_true")
+    run.add_argument("--rebalance", choices=["daily", "weekly", "monthly"], default="daily")
+    run.add_argument("--hold-buffer", type=int, default=0)
+    run.add_argument("--turnover-limit", type=float, default=1.0)
+    run.add_argument("--min-turnover", type=float, default=0.0)
+    run.add_argument("--participation", type=float, default=1.0)
+    run.add_argument("--impact-bps", type=float, default=0.0)
+    run.add_argument("--terminal-policy", choices=["error", "writeoff"], default="error")
+    run.add_argument("--horizon", type=int, choices=[1, 5, 20], default=1)
+    run.add_argument("--feature-set", choices=["compact", "alpha158"], default="compact")
+    run.add_argument("--evaluation", choices=["holdout", "walk-forward"], default="holdout")
+    run.add_argument("--train-years", type=int, default=3)
+    run.add_argument("--valid-years", type=int, default=1)
+    run.add_argument("--open-final", action="store_true")
+    run.add_argument("--null-draws", type=int, default=19)
     run.add_argument("--worker", action="store_true", help=argparse.SUPPRESS)
     bank = sub.add_parser("bank-import", help="Validate and snapshot a supplied CSV/Parquet")
     bank.add_argument("source", type=Path)
@@ -41,6 +84,14 @@ def parser():
     member = sub.add_parser("membership-audit", help="Audit a user-supplied NiftyHistory CSV")
     member.add_argument("source", type=Path)
     member.add_argument("--output", type=Path, required=True)
+    convert = sub.add_parser("bhavcopy", help="Convert raw NSE legacy/UDiFF files; no adjustment inferred")
+    convert.add_argument("sources", nargs="+", type=Path)
+    convert.add_argument("--output", required=True, type=Path)
+    cal = sub.add_parser("calendar-build", help="Export verified sessions; reject dates outside coverage")
+    cal.add_argument("--start", required=True)
+    cal.add_argument("--end", required=True)
+    cal.add_argument("--extra", action="append", default=[])
+    cal.add_argument("--output", required=True, type=Path)
     return p
 
 
@@ -73,6 +124,12 @@ def launch(args):
         command.append("--synthetic")
     if args.calendar:
         command.extend(["--calendar", str(args.calendar)])
+    for key in EXTRA:
+        value = getattr(args, key, None)
+        if value is True:
+            command.append("--" + key.replace("_", "-"))
+        elif value is not None and value is not False:
+            command.extend(["--" + key.replace("_", "-"), str(value)])
     process = subprocess.Popen(command, start_new_session=(os.name == "posix"))
     try:
         code = process.wait(timeout=profile.timeout_seconds)
@@ -149,6 +206,7 @@ def main(argv=None):
                     args.sell_cost,
                     args.topk,
                     args.capital,
+                    **{key: getattr(args, key) for key in EXTRA},
                 )
             else:
                 launch(args)
@@ -157,6 +215,29 @@ def main(argv=None):
             from .data import bank_import
 
             print(bank_import(args.source, args.bank, PROFILES[args.mode], args.provenance))
+        elif args.command == "calendar-build":
+            from indian_market_core.calendar import sessions
+
+            result = sessions(args.start, args.end, args.extra)
+            with args.output.open("x") as stream:
+                stream.write("\n".join(result) + "\n")
+        elif args.command == "bhavcopy":
+            import pandas as pd
+            from indian_market_core.bhavcopy import read_one
+
+            from .data import validate
+
+            rows = []
+            for source in args.sources:
+                read_one(source, "EQ", rows)
+            if not rows:
+                raise ValueError("No EQ rows found")
+            frame = pd.DataFrame(rows)
+            frame["date"] = frame.pop("timestamp").str[:10]
+            frame["factor"] = 1.0
+            frame = validate(frame)
+            with args.output.open("x") as stream:
+                frame.to_csv(stream, index=False)
         elif args.command == "membership-audit":
             from .membership import write_audit
 
