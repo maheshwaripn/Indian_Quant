@@ -13,3 +13,7 @@ These are software/accounting checks, not market-performance validation. There h
 Qlib 0.9.7 emits upstream pandas/NumPy deprecation warnings. CI targets Ubuntu Python 3.11/3.12; no CPython 3.13 wheel was available for the pinned Qlib release when checked. Native Quant Windows/macOS installation is not certified. Reports are generated as escaped standalone HTML with local SVGs; no claim of browser/viewport visual certification is made.
 
 Check [GitHub Actions](https://github.com/maheshwaripn/Indian_Quant/actions) for the exact commit's result. A historical validation note is not evidence that a later revision passes. Only `status: completed` manifests represent completed runs; preserve failed/partial runs for the trial record.
+
+## Follow-up documentation review — 2026-11-09
+
+New tests verify train-only fitted preprocessing despite perturbed future targets, rejection of future training rows, no arbitrary selection without validation IC, purging for 1/5/20-session labels, and historical membership invariance under future reconstitution changes. A separate-process Qlib test perturbs future prices and verifies earlier feature values remain unchanged. Hand-checked evidence tests cover compounding, drawdown, unavailable ratios, fold screens and incomplete quality coverage. Existing Qlib demo, Alpha158, sparse-history and annual walk-forward integration cases remain mandatory. Package smoke checks verify CLI entry point and distribution metadata from built artifacts. These checks do not certify semantic correctness of vendor adjustments or market execution.

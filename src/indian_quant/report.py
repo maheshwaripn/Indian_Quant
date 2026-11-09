@@ -67,6 +67,39 @@ def render(manifest, portfolio, path):
         if manifest["synthetic"]
         else "RESEARCH SIMULATION — CHECK UNIVERSE COVERAGE"
     )
+    validity = manifest.get("research_validity", {})
+    flags = "".join(
+        f"<li><strong>{escape(flag['severity'])}: {escape(flag['code'])}</strong> — {escape(flag['message'])}</li>"
+        for flag in validity.get("flags", [])
+    )
+    quality = escape(json.dumps(manifest.get("data_quality", {}), indent=2))
+    fold_columns = [
+        "valuation_start",
+        "valuation_end",
+        "selected_model",
+        "rank_ic",
+        "icir_unannualized",
+        "total_return_net",
+        "excess_return_difference",
+        "max_drawdown",
+        "sharpe_zero_rf",
+        "mean_daily_turnover",
+    ]
+    fold_frame = pd.DataFrame(manifest.get("folds", []))
+    fold_table = fold_frame.reindex(columns=fold_columns).to_html(
+        index=False, escape=True, na_rep="Unavailable", float_format=lambda v: f"{v:.5f}"
+    )
+    baseline_table = pd.DataFrame(
+        [
+            {"Portfolio": "Selected model", "Net return": manifest["metrics"]["total_return_net"]},
+            {"Portfolio": "Momentum, same rebalance", "Net return": stats.get("momentum_net_return")},
+            {
+                "Portfolio": "Momentum, monthly rebalance",
+                "Net return": stats.get("monthly_momentum_net_return"),
+            },
+            {"Portfolio": "Equal-weight eligible", "Net return": stats.get("equal_weight_net_return")},
+        ]
+    ).to_html(index=False, escape=True, na_rep="Unavailable", float_format=lambda v: f"{v:.5f}")
     diagnostics = escape(json.dumps(manifest.get("statistics", {}), indent=2))
     page = f"""<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width">
 <title>Indian Quant research report</title><style>
@@ -75,6 +108,8 @@ h1,h2{{color:#0f172a}}.banner{{background:#fef3c7;padding:15px;border-radius:8px
 td,th{{text-align:left;border-bottom:1px solid #475569;padding:12px;overflow-wrap:anywhere}}svg{{width:100%;background:#fff}}
 pre{{white-space:pre-wrap;overflow-wrap:anywhere}}.card{{background:#fff;padding:20px;margin:20px 0;border-radius:12px}}
 </style><h1>Indian Quant</h1><p class="banner">{status} · Educational use · No live orders</p>
+<h2>Research validity: {escape(validity.get("status", "UNASSESSED"))}</h2><ul>{flags}</ul>
+<details><summary>Input quality and coverage</summary><pre>{quality}</pre></details>
 <div class="card"><h2>Out-of-sample equity</h2><p>Blue: strategy after configured costs. Gold: supplied benchmark.
 Both start at 1. Vertical range: {low:.3f}–{high:.3f}. Horizontal axis: test sessions in chronological order.</p>
 <svg viewBox="0 0 800 260" role="img" aria-label="Strategy and benchmark compounded equity">{"".join(lines)}</svg></div>
@@ -87,6 +122,13 @@ Rank IC measures ordering skill, not net profitability. Test results must not be
 means results remain consistent with chance under these checks. A small p-value does not prove an edge.
 Intervals cover return, annualised return, Sharpe and drawdown under the same block bootstrap. They are conditional estimates, not future-loss bounds. Other metrics are descriptive.
 Cost stress reruns sizing and execution; the first losing tested multiplier is a coarse threshold, not an exact breakeven.</p>
+<h2>Does the selected model beat simpler portfolios?</h2>{baseline_table}
+<p>Same costs and constraints; monthly momentum changes only rebalance cadence. Differences are descriptive,
+not a license to reselect on test results. A supplied index benchmark is a price-series comparator, not a costed fund.</p>
+<h2>Fold-by-fold evidence</h2><div style="overflow-x:auto">{fold_table}</div>
+<p>Each fold is attributed from the continuous account, including cross-fold holdings. IC uses available forward labels;
+quintile spread in folds.json is gross and not an executable long-short return. See fold dispersion below.
+A 60% positive-IC screen alone cannot establish candidate status; independent regime evidence is unavailable.</p>
 <h2>Year-by-year net performance</h2><table><tr><th>Year</th><th>Net return</th></tr>{yearly}</table>
 <h2>Ordering skill and exposure over time</h2>{charts}
 <h2>Gross forward returns by predicted decile</h2>{decile_table}

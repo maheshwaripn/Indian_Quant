@@ -13,9 +13,8 @@ for path in files:
             continue
         if not (path.parent / link.split("#")[0]).exists():
             errors.append(f"{path.relative_to(root)}: missing {link}")
-    if path.name == "SKILL.md":
-        if not re.match(r"^---\nname: [a-z0-9-]+\ndescription: .+\n---\n", text):
-            errors.append(f"{path}: invalid skill metadata")
+    if path.name == "SKILL.md" and not re.match(r"^---\nname: [a-z0-9-]+\ndescription: .+\n---\n", text):
+        errors.append(f"{path}: invalid skill metadata")
 if errors:
     raise SystemExit("\n".join(errors))
 print(f"Checked {len(files)} documentation files")

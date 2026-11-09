@@ -1,17 +1,28 @@
 """Fixed chronological evaluation using Qlib expressions and portfolio execution."""
 
+import hashlib
 import importlib.metadata
 import json
 import math
 import platform
 import subprocess
 import time
+from datetime import UTC, datetime
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
 
 from .data import digest, read_bars, write_qlib
+from .evidence import (
+    factor_evidence,
+    fit_candidate,
+    fold_dispersion,
+    performance,
+    quality_panel,
+    select_model,
+    validity_panel,
+)
 from .report import render
 from .resources import configure
 
@@ -245,6 +256,15 @@ def run(
         raise ValueError("Unknown evaluation")
     boundaries = {**boundaries, **folds[0][1]}
     protocol = {
+        "schema_version": 2,
+        "registered_at": datetime.now(UTC).isoformat(),
+        "registration_scope": "Before fitting in this run; not proof of registration before data inspection",
+        "hypothesis_id": output.name,
+        "primary_metric": "validation mean daily rank IC",
+        "candidate_models": list(candidates),
+        "selection_rule": "maximum available validation rank IC; test results excluded",
+        "external_trials_count": None,
+        "feature_set_sha256": hashlib.sha256(json.dumps(features, sort_keys=True).encode()).hexdigest(),
         "evaluation": evaluation,
         "horizon": horizon,
         "features": feature_set,
@@ -275,23 +295,29 @@ def run(
     model_parts = {name: [] for name in candidates}
     for split, bound in folds:
         train = split["train"].dropna(subset=["label"])
-        validation = {}
+        validation, model_evidence = {}, {}
+        target = pd.concat([split["valid"], split["test"]]).sort_index()
         for name, model in candidates.items():
             if model is None:
                 # Alpha158 does not use the compact feature names.
                 key = "momentum20" if "momentum20" in panel else "ROC20"
-                prediction = panel[key] * (1 if key == "momentum20" else -1)
+                prediction = target[key] * (1 if key == "momentum20" else -1)
+                model_evidence[name] = {"fit_seconds": 0.0, "inference_seconds": 0.0, "fitted": False}
             else:
-                model.fit(train[list(features)], train.label)
-                prediction = pd.Series(model.predict(panel[list(features)]), index=panel.index)
+                prediction, _, model_evidence[name] = fit_candidate(model, train, target, list(features))
             predictions[name] = prediction
             validation[name] = rank_ic(split["valid"].assign(prediction=prediction).dropna(subset=["label"]))
             model_parts[name].append(split["test"].assign(prediction=prediction))
-        selected = max(
-            validation, key=lambda name: validation[name] if validation[name] is not None else -np.inf
-        )
+        selected = select_model(validation)
         selected_parts.append(split["test"].assign(prediction=predictions[selected]))
-        fold_results.append({**bound, "selected_model": selected, "validation_rank_ic": validation})
+        fold_results.append(
+            {
+                **bound,
+                "selected_model": selected,
+                "validation_rank_ic": validation,
+                "model_evidence": model_evidence,
+            }
+        )
     test = pd.concat(selected_parts).sort_index()
     model_frames = {name: pd.concat(parts).sort_index() for name, parts in model_parts.items()}
     test_scores = {name: rank_ic(frame.dropna(subset=["label"])) for name, frame in model_frames.items()}
@@ -336,6 +362,31 @@ def run(
     fills.to_csv(output / "fills.csv", index=False)
     baseline, _ = simulate(signals=canonical(test.prediction), equal_weight=True, **execution)
     baseline.to_csv(output / "equal_weight.csv")
+    momentum, _ = simulate(signals=canonical(model_frames["momentum"].prediction), **execution)
+    momentum.to_csv(output / "momentum.csv")
+    slow_momentum, _ = simulate(
+        signals=canonical(model_frames["momentum"].prediction), **{**execution, "rebalance": "monthly"}
+    )
+    slow_momentum.to_csv(output / "momentum_monthly.csv")
+    # Fold attribution uses one continuous account; no artificial annual liquidation.
+    starts = [
+        calendar[calendar.get_loc(part.index.get_level_values("datetime").min()) + 1]
+        for part in selected_parts
+    ]
+    for i, (part, record) in enumerate(zip(selected_parts, fold_results)):
+        stop = starts[i + 1] if i + 1 < len(starts) else dates[-1] + pd.Timedelta(days=1)
+        segment = portfolio.loc[(portfolio.index >= starts[i]) & (portfolio.index < stop)]
+        record.update(factor_evidence(part, horizon))
+        record.update(performance(segment))
+        record.update(
+            valuation_start=str(segment.index.min().date()),
+            valuation_end=str(segment.index.max().date()),
+            attribution="Continuous account segment; holdings can cross fold boundaries; final exit only at study end",
+        )
+    (output / "folds.json").write_text(json.dumps(fold_results, indent=2, allow_nan=False))
+    pd.DataFrame(
+        [{k: v for k, v in record.items() if not isinstance(v, dict)} for record in fold_results]
+    ).to_csv(output / "folds.csv", index=False)
     rng = np.random.default_rng(17)
     null_returns = []
     for _ in range(null_draws):
@@ -390,6 +441,11 @@ def run(
             "p_value": (1 + sum(x >= total for x in null_returns)) / (null_draws + 1),
         },
         "multiple_model_check": multiple_model_check(model_frames, block=max(5, horizon)),
+        "fold_dispersion": fold_dispersion(fold_results),
+        "momentum_net_return": float(momentum.equity.iloc[-1] / capital - 1),
+        "monthly_momentum_net_return": float(slow_momentum.equity.iloc[-1] / capital - 1),
+        "selected_minus_momentum_return": total - float(momentum.equity.iloc[-1] / capital - 1),
+        "performance_extended": performance(portfolio),
         "equal_weight_net_return": float(baseline.equity.iloc[-1] / capital - 1),
         "cost_stress_net_returns": stress,
         "first_tested_nonpositive_cost_multiplier": next((int(k) for k, v in stress.items() if v <= 0), None),
@@ -428,6 +484,10 @@ def run(
             "status": "completed",
             "schema_version": 2,
             "statistics": statistics,
+            "data_quality": quality_panel(df, calendar),
+            "research_validity": validity_panel(
+                synthetic, membership, assume_membership_known, evaluation, statistics
+            ),
             "folds": fold_results,
             "protocol": protocol,
             "selected_model": selected,
@@ -474,7 +534,7 @@ def run(
                 "India delivery schedule estimates or explicit proportional fees; verify broker contract notes",
                 "Final close liquidation includes fees and impact; unresolved positions require explicit writeoff or fail",
                 "Benchmark is supplied price-return series unless user supplies a documented total-return series",
-                "Label is next-open to following-open; portfolio is marked daily to close and holds persistent positions",
+                f"Label uses {horizon} sessions after next-open entry; portfolio is marked daily to close and holds persistent positions",
                 "Walk-forward folds retrain annually; final year stays closed unless explicitly opened"
                 if evaluation == "walk-forward"
                 else "One chronological holdout; not production validation",
@@ -493,6 +553,7 @@ def run(
         "return_interval": statistics["net_return_interval"],
         "shuffle_p": statistics["shuffled_signal"]["p_value"],
     }
+    brief["research_status"] = manifest["research_validity"]["status"]
     text = json.dumps(brief, indent=2, allow_nan=False)
     if len(text) > profile.brief_chars:
         raise ValueError("Brief budget exceeded")

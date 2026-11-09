@@ -68,6 +68,10 @@ Start with [the complete tutorial](docs/getting-started.md), then [choose data](
 
 No broker orders, automated paper fills, options engine, corporate-action repair or certified investability are provided. Resource modes cap workers and runtime, not every allocation of RAM. [Remaining work](docs/roadmap.md) is explicitly separated from tested functionality.
 
+### Follow-up review improvements (0.2.1)
+
+Fold-level metrics and model timings, IC dispersion, same-cadence/monthly momentum portfolios, prominent validity and input-quality panels, dedicated leakage/PIT regressions and package-build checks are now included. Read the [review disposition](docs/review-response-2026-11-09.md), [validity checklist](docs/research-validity-checklist.md), [provider mappings](docs/data-provider-adapters.md) and [runbook](docs/runbook.md). Corporate-action processing, circuit rules, advanced trial statistics and quarterly retraining remain explicitly deferred.
+
 ## Four resource modes
 
 | Mode | Worker cap | Row cap | Instrument cap including benchmark | Research timeout | Suggested RAM |

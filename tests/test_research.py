@@ -35,6 +35,16 @@ def test_real_qlib_end_to_end(tmp_path):
     predictions = pd.read_csv(run / "predictions.csv")
     assert predictions.datetime.min() >= manifest["boundaries"]["test_signal_start"]
     portfolio = pd.read_csv(run / "portfolio.csv")
+    assert manifest["research_validity"]["status"] == "SYNTHETIC_ONLY"
+    assert manifest["research_validity"]["external_trials_count"] is None
+    folds = json.loads((run / "folds.json").read_text())
+    assert sum(fold["sessions"] for fold in folds) == len(portfolio)
+    assert folds[0]["total_return_net"] == manifest["metrics"]["total_return_net"]
+    assert "training_frame_sha256" in folds[0]["model_evidence"]["ridge"]
+    for filename in ("momentum.csv", "momentum_monthly.csv"):
+        baseline = pd.read_csv(run / filename)
+        assert len(baseline) == len(portfolio)
+        assert baseline.cost.sum() > 0
     assert portfolio.cost.sum() > 0
     assert portfolio.turnover.sum() > 0
     assert (run / "report.html").stat().st_size > 3000
