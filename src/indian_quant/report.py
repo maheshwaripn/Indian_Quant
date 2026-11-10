@@ -72,6 +72,8 @@ def render(manifest, portfolio, path):
         f"<li><strong>{escape(flag['severity'])}: {escape(flag['code'])}</strong> — {escape(flag['message'])}</li>"
         for flag in validity.get("flags", [])
     )
+    fee_coverage = escape(json.dumps(manifest.get("cost_coverage", {}), indent=2))
+    constraints = escape(json.dumps(stats.get("execution_constraints", {}), indent=2))
     quality = escape(json.dumps(manifest.get("data_quality", {}), indent=2))
     fold_columns = [
         "valuation_start",
@@ -131,6 +133,8 @@ quintile spread in folds.json is gross and not an executable long-short return. 
 A 60% positive-IC screen alone cannot establish candidate status; independent regime evidence is unavailable.</p>
 <h2>Year-by-year net performance</h2><table><tr><th>Year</th><th>Net return</th></tr>{yearly}</table>
 <h2>Ordering skill and exposure over time</h2>{charts}
+<h2>What constrained purchases?</h2><pre>{constraints}</pre>
+<h2>Fee coverage and explicit bridges</h2><pre>{fee_coverage}</pre>
 <h2>Gross forward returns by predicted decile</h2>{decile_table}
 <details><summary>Full uncertainty, baseline, capacity and cost diagnostics</summary><pre>{diagnostics}</pre></details>
 <p>ic.csv shows daily rank IC; deciles.csv shows gross forward label returns by predicted rank (10 highest),

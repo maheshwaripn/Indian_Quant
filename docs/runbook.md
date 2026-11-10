@@ -32,3 +32,9 @@ Review disk usage first. Remove only identified, regenerable caches after backup
 ## Upgrades
 
 Use an isolated environment and a clean Git revision. Run tests, lint, docs and package build checks before adopting a new Qlib/shared-core version. Preserve old environments or dependency inventories for previous studies. No systemd/cron job, public report server or broker connection is installed by this runbook.
+
+## Progress and explicit historical fee assumptions
+
+Run with `--timeout-hours 8` when a measured study needs more than the mode default. Redirect stderr to a retained log if desired. `progress.json` is atomically replaced with the stage, elapsed seconds and, during shuffles, completed/total draws. It is a stage checkpoint, not a continuously refreshed heartbeat or a restart/resume file. Long individual model fits can leave the stage unchanged. Only a completed manifest establishes success.
+
+For India fees before 2023-04-01, explicitly select `--cost-before-coverage proportional` and set `--buy-cost` and `--sell-cost` to documented aggregate assumptions. Within verified coverage the shared India engine still applies. Dates after 2026-11-08 still fail. Training dates alone do not require fee coverage. The manifest, fills and report disclose the bridge; it is not a reconstruction of historical taxes. See [the complete example](issue-1-resolution.md).

@@ -10,7 +10,7 @@ import sys
 import time
 from pathlib import Path
 
-from .resources import PROFILES, configure, describe
+from .resources import PROFILES, configure, describe, timeout_seconds
 
 EXTRA = (
     "membership",
@@ -33,6 +33,8 @@ EXTRA = (
     "null_draws",
     "cost_model",
     "broker",
+    "cost_before_coverage",
+    "timeout_hours",
 )
 
 
@@ -44,7 +46,7 @@ def parser():
     demo = sub.add_parser("demo", help="Generate fictional bars and run genuine Qlib integration")
     demo.add_argument("--workspace", type=Path, default=Path("workspace"))
     demo.add_argument("--mode", choices=PROFILES, default="essential")
-    run = sub.add_parser("run", help="Run fixed-universe chronological research")
+    run = sub.add_parser("run", help="Run chronological equity research")
     run.add_argument("--data", required=True, type=Path)
     run.add_argument("--output", required=True, type=Path)
     run.add_argument("--calendar", type=Path)
@@ -75,6 +77,8 @@ def parser():
     run.add_argument("--valid-years", type=int, default=1)
     run.add_argument("--open-final", action="store_true")
     run.add_argument("--null-draws", type=int, default=19)
+    run.add_argument("--cost-before-coverage", choices=["error", "proportional"], default="error")
+    run.add_argument("--timeout-hours", type=float, help="Explicit wall-clock budget, maximum 168 hours")
     run.add_argument("--worker", action="store_true", help=argparse.SUPPRESS)
     bank = sub.add_parser("bank-import", help="Validate and snapshot a supplied CSV/Parquet")
     bank.add_argument("source", type=Path)
@@ -82,6 +86,7 @@ def parser():
     bank.add_argument("--provenance", required=True, help="Source, licence and adjustment convention")
     bank.add_argument("--mode", choices=PROFILES, default="essential")
     member = sub.add_parser("membership-audit", help="Audit a user-supplied NiftyHistory CSV")
+    member.add_argument("--expected-size", type=int, help="Expected membership count for a custom index")
     member.add_argument("source", type=Path)
     member.add_argument("--output", type=Path, required=True)
     convert = sub.add_parser("bhavcopy", help="Convert raw NSE legacy/UDiFF files; no adjustment inferred")
@@ -96,7 +101,8 @@ def parser():
 
 
 def launch(args):
-    profile, _ = configure(args.mode)
+    configure(args.mode)
+    budget = timeout_seconds(args.mode, getattr(args, "timeout_hours", None))
     command = [
         sys.executable,
         "-m",
@@ -132,7 +138,7 @@ def launch(args):
             command.extend(["--" + key.replace("_", "-"), str(value)])
     process = subprocess.Popen(command, start_new_session=(os.name == "posix"))
     try:
-        code = process.wait(timeout=profile.timeout_seconds)
+        code = process.wait(timeout=budget)
     except (subprocess.TimeoutExpired, KeyboardInterrupt) as error:
         if os.name == "posix":
             try:
@@ -241,7 +247,7 @@ def main(argv=None):
         elif args.command == "membership-audit":
             from .membership import write_audit
 
-            print(json.dumps(write_audit(args.source, args.output), indent=2))
+            print(json.dumps(write_audit(args.source, args.output, args.expected_size), indent=2))
     except (ValueError, OSError) as error:
         print(f"Error: {error}", file=sys.stderr)
         return 2

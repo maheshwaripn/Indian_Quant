@@ -17,3 +17,7 @@ Check [GitHub Actions](https://github.com/maheshwaripn/Indian_Quant/actions) for
 ## Follow-up documentation review — 2026-11-09
 
 New tests verify train-only fitted preprocessing despite perturbed future targets, rejection of future training rows, no arbitrary selection without validation IC, purging for 1/5/20-session labels, and historical membership invariance under future reconstitution changes. A separate-process Qlib test perturbs future prices and verifies earlier feature values remain unchanged. Hand-checked evidence tests cover compounding, drawdown, unavailable ratios, fold screens and incomplete quality coverage. Existing Qlib demo, Alpha158, sparse-history and annual walk-forward integration cases remain mandatory. Package smoke checks verify CLI entry point and distribution metadata from built artifacts. These checks do not certify semantic correctness of vendor adjustments or market execution.
+
+## Issue #1 regression coverage (0.2.2)
+
+Nine additional tests exercise explicit historical fee bridges, resource overrides, custom membership sizes, prepared simulation equivalence and purchase-constraint accounting. The complete suite contains 49 tests. Performance evidence and its synthetic-data limits are recorded in [issue #1 resolution](issue-1-resolution.md).

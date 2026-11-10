@@ -44,3 +44,11 @@ Always separate research simulations, paper observations and actual broker fills
 `momentum.csv` uses the same rebalance, costs and execution controls; `momentum_monthly.csv` changes cadence only. Monthly does not guarantee lower realised turnover. Compare these before claiming machine learning adds value; do not reselect on displayed test results. The report's input-quality panel covers accepted data between each instrument's observed endpoints and cannot prove complete listing/delisting coverage.
 
 Research status remains synthetic-only or exploratory-only. Prior test access and external trial counts are UNKNOWN. See [the validity checklist](research-validity-checklist.md).
+
+## Explaining low exposure
+
+`portfolio.csv` records cash and requested/filled buy notionals. Unfilled requested buys are attributed sequentially to turnover, participation, then available cash/fees; unavailable liquidity is recorded separately. These currency totals explain the algorithm's constraints, not a unique counterfactual estimate of the return lost to cash. Repeated attempts can count the same desired investment on multiple rebalance dates.
+
+`filtered_untradable`, `filtered_liquidity` and `eligible_without_signal` are candidate-session counts on rebalance dates, not currency values. They describe candidates excluded before target purchases and must not be added to unfilled notionals. The report includes aggregate purchase constraints alongside exposure. Weekly/monthly partial fills are reconsidered at the next scheduled rebalance, not automatically topped up every day. Compare cadence deliberately without weakening liquidity limits merely to increase exposure.
+
+The fee-coverage panel and `fills.csv` cost regime identify proportional bridge assumptions separately from verified India fee calculations. A bridge warning remains visible in research validity.

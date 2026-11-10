@@ -39,7 +39,7 @@ indian-quant run --data /path/bars.parquet --calendar /path/sessions.txt \
   --null-draws 99 --mode lab --output workspace/runs/predeclared-study-001
 ```
 
-These numbers illustrate syntax, not recommended investment settings. Older multi-year studies need explicit historical fee assumptions: `--cost-model india --broker discount` is limited to 2023-04-01 through 2026-11-08. Do not pass the knowledge-assumption flag if you have not accepted it. On a short dataset use `--evaluation holdout`; insufficient yearly folds fail. Omit `--open-final` until settings are frozen. Use a new output directory for every attempt. Review resources before raising null draws (9–999); the parent CLI kills jobs exceeding the selected profile timeout.
+These numbers illustrate syntax, not recommended investment settings. Older multi-year studies can explicitly select `--cost-before-coverage proportional` with documented buy/sell rates before coverage (see [issue #1 resolution](issue-1-resolution.md)). Without that bridge, `--cost-model india --broker discount` is limited to 2023-04-01 through 2026-11-08. Do not pass the knowledge-assumption flag if you have not accepted it. On a short dataset use `--evaluation holdout`; insufficient yearly folds fail. Omit `--open-final` until settings are frozen. Use a new output directory for every attempt. Review resources before raising null draws (9–999); the parent CLI kills jobs exceeding the selected profile timeout or explicit `--timeout-hours` budget.
 
 ## 5. Read the evidence
 

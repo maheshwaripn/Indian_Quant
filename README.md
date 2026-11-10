@@ -78,7 +78,7 @@ Fold-level metrics and model timings, IC dispersion, same-cadence/monthly moment
 |---|---:|---:|---:|---:|---:|
 | essential | 1 | 100,000 | 50 | 10 minutes | 4 GB |
 | guided | 2 | 500,000 | 200 | 30 minutes | 8 GB |
-| lab | 4 | 3,000,000 | 1,000 | 2 hours | 16 GB |
+| lab | 4 | 3,000,000 | 2,000 | 2 hours | 24 GB |
 | vps | 2 | 1,000,000 | 600 | 1 hour | 8 GB |
 
 Use `indian-quant modes` or `indian-quant demo --mode guided`. Workers and numerical thread pools are capped; CSV/Parquet row counts and instrument counts are checked; CLI research runs have a timeout. RAM and disk recommendations are **advisory**, not hard isolation. Three fixed model candidates are used in every mode. There are zero built-in AI calls, so these profiles do not control an external coding assistant's spending. See [resources](docs/resources.md).
@@ -124,3 +124,7 @@ Browser chat alone cannot access your machine merely from a repository URL. See 
 Educational and research use only; not personalized investment advice. You own your decisions, capital, data permissions and deployment risk. Backtests are hypothetical and cannot guarantee returns. Users may configure research risk assumptions, but this repository does not override broker, exchange, legal or AI-provider requirements.
 
 Code: [MIT licence](LICENSE). Qlib is an upstream dependency with its own licence. No proprietary exchange data, broker credentials or NiftyHistory raw history is distributed. [Indian_Trader_skill](https://github.com/maheshwaripn/Indian_Trader_skill) is the companion workflow project; installation fetches a pinned companion distribution for the shared dependency-free market utilities; it does not run Trader commands.
+
+### Real-data workflow fixes (0.2.2)
+
+Historical cost bridges, custom index-size audits, larger historical universes, explicit timeout overrides, progress files and purchase-constraint diagnostics are described in [issue #1 resolution](docs/issue-1-resolution.md). Portfolio trials reuse prepared market arrays to reduce repeated work; trading rules are unchanged.

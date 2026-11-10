@@ -19,6 +19,10 @@ def symbols(value):
 
 
 def audit(path, expected_size=None):
+    if expected_size is not None and (
+        isinstance(expected_size, bool) or not isinstance(expected_size, int) or expected_size < 1
+    ):
+        raise ValueError("Expected membership size must be a positive integer")
     with open(path, encoding="utf-8-sig", newline="") as stream:
         rows = list(csv.DictReader(stream))
     if not rows:
@@ -88,8 +92,8 @@ def audit(path, expected_size=None):
     }
 
 
-def write_audit(source, destination):
-    result = audit(source)
+def write_audit(source, destination, expected_size=None):
+    result = audit(source, expected_size)
     with open(destination, "x", encoding="utf-8") as stream:
         json.dump(result, stream, indent=2)
     return {

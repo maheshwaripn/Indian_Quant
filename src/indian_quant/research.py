@@ -6,6 +6,7 @@ import json
 import math
 import platform
 import subprocess
+import sys
 import time
 from datetime import UTC, datetime
 from pathlib import Path
@@ -24,7 +25,7 @@ from .evidence import (
     validity_panel,
 )
 from .report import render
-from .resources import configure
+from .resources import configure, timeout_seconds
 
 FEATURES = {
     "momentum5": "$close/Ref($close,5)-1",
@@ -95,6 +96,8 @@ def run(
     null_draws=19,
     cost_model="proportional",
     broker="zero",
+    cost_before_coverage="error",
+    timeout_hours=None,
 ):
     started = time.monotonic()
     profile, workers = configure(mode)
@@ -105,16 +108,23 @@ def run(
     df = read_bars(source, profile)
     if cost_model not in ("india", "proportional"):
         raise ValueError("Unknown cost model")
-    if cost_model == "india":
-        from indian_market_core.costs import rates
-
-        rates("delivery", df.date.min().date().isoformat())
-        rates("delivery", df.date.max().date().isoformat())
+    if cost_before_coverage not in ("error", "proportional"):
+        raise ValueError("Unknown pre-coverage cost policy")
+    wall_clock_budget = timeout_seconds(mode, timeout_hours)
     output = Path(output).resolve()
     output.mkdir(parents=True, exist_ok=False)
     manifest = {"status": "running", "mode": mode, "synthetic": synthetic, "source_sha256": digest(source)}
     manifest_path = output / "manifest.json"
     manifest_path.write_text(json.dumps(manifest, indent=2))
+
+    def progress(stage, **details):
+        record = {"stage": stage, "elapsed_seconds": round(time.monotonic() - started, 2), **details}
+        print("[indian-quant] " + json.dumps(record), file=sys.stderr, flush=True)
+        temporary = output / "progress.json.tmp"
+        temporary.write_text(json.dumps(record, indent=2))
+        temporary.replace(output / "progress.json")
+
+    progress("input_validated", rows=len(df), historical_instruments=df.symbol.nunique())
     if calendar_path:
         calendar = pd.DatetimeIndex(pd.to_datetime(Path(calendar_path).read_text().splitlines()))
     elif synthetic:
@@ -181,6 +191,7 @@ def run(
         expressions, names = Alpha158DL.get_feature_config()
         features = dict(zip(names, expressions))
     label = f"Ref($open,-{horizon + 1})/Ref($open,-1)-1"
+    progress("qlib_features", feature_set=feature_set, instruments=len(symbols))
     panel = D.features(
         symbols, list(features.values()) + [label], start_time=calendar[0], end_time=calendar[-1]
     )
@@ -254,9 +265,17 @@ def run(
             )
     elif evaluation != "holdout":
         raise ValueError("Unknown evaluation")
+    from .cost_policy import coverage
+
+    first_signal = min(split["test"].index.get_level_values("datetime").min() for split, _ in folds)
+    last_signal = max(split["test"].index.get_level_values("datetime").max() for split, _ in folds)
+    cost_dates = calendar[calendar.get_loc(first_signal) + 1 : calendar.get_loc(last_signal) + 2]
+    fee_coverage = coverage(cost_dates, cost_model, cost_before_coverage, buy_cost, sell_cost)
     boundaries = {**boundaries, **folds[0][1]}
     protocol = {
         "schema_version": 2,
+        "timeout_seconds": wall_clock_budget,
+        "cost_before_coverage": cost_before_coverage,
         "registered_at": datetime.now(UTC).isoformat(),
         "registration_scope": "Before fitting in this run; not proof of registration before data inspection",
         "hypothesis_id": output.name,
@@ -293,7 +312,8 @@ def run(
     (output / "protocol.json").write_text(json.dumps(protocol, indent=2))
     predictions, validation, test_scores, selected_parts, fold_results = {}, {}, {}, [], []
     model_parts = {name: [] for name in candidates}
-    for split, bound in folds:
+    for fold_number, (split, bound) in enumerate(folds, start=1):
+        progress("fit_fold", fold=fold_number, folds=len(folds))
         train = split["train"].dropna(subset=["label"])
         validation, model_evidence = {}, {}
         target = pd.concat([split["valid"], split["test"]]).sort_index()
@@ -318,6 +338,7 @@ def run(
                 "model_evidence": model_evidence,
             }
         )
+    progress("models_complete", folds=len(folds))
     test = pd.concat(selected_parts).sort_index()
     model_frames = {name: pd.concat(parts).sort_index() for name, parts in model_parts.items()}
     test_scores = {name: rank_ic(frame.dropna(subset=["label"])) for name, frame in model_frames.items()}
@@ -326,7 +347,7 @@ def run(
     start = calendar[calendar.get_loc(test_dates[0]) + 1]
     end = calendar[calendar.get_loc(test_dates[-1]) + 1]
     dates = calendar[(calendar >= start) & (calendar <= end)]
-    from .execution import simulate
+    from .execution import prepare_market, simulate
     from .statistics import hac_t, ic_series, interval, multiple_model_check
 
     # Qlib normalizes instrument identifiers to lowercase; source symbols are canonical uppercase.
@@ -337,8 +358,12 @@ def run(
         )
         return signal
 
+    progress("prepare_market", valuation_sessions=len(dates))
+    prepared = prepare_market(df, dates, benchmark, calendar)
     execution = {
         "bars": df,
+        "prepared": prepared,
+        "cost_before_coverage": cost_before_coverage,
         "full_calendar": calendar,
         "dates": dates,
         "benchmark": benchmark,
@@ -357,11 +382,14 @@ def run(
         "cost_model": cost_model,
         "broker": broker,
     }
+    progress("selected_portfolio")
     portfolio, fills = simulate(signals=canonical(test.prediction), **execution)
     portfolio.to_csv(output / "portfolio.csv")
     fills.to_csv(output / "fills.csv", index=False)
+    progress("equal_weight_baseline")
     baseline, _ = simulate(signals=canonical(test.prediction), equal_weight=True, **execution)
     baseline.to_csv(output / "equal_weight.csv")
+    progress("momentum_baselines")
     momentum, _ = simulate(signals=canonical(model_frames["momentum"].prediction), **execution)
     momentum.to_csv(output / "momentum.csv")
     slow_momentum, _ = simulate(
@@ -389,12 +417,14 @@ def run(
     ).to_csv(output / "folds.csv", index=False)
     rng = np.random.default_rng(17)
     null_returns = []
-    for _ in range(null_draws):
+    for draw in range(null_draws):
+        progress("shuffled_signals", completed=draw, total=null_draws)
         shuffled = test.prediction.groupby(level="datetime", group_keys=False).transform(
             lambda x: rng.permutation(x.to_numpy())
         )
         null_portfolio, _ = simulate(signals=canonical(shuffled), **execution)
         null_returns.append(float(null_portfolio.equity.iloc[-1] / capital - 1))
+    progress("shuffled_signals", completed=null_draws, total=null_draws)
     daily_ic = ic_series(test)
     daily_ic.rename("rank_ic").to_csv(output / "ic.csv")
     deciles = test.dropna(subset=["label"]).copy()
@@ -404,6 +434,7 @@ def run(
     deciles.groupby("decile").label.agg(["mean", "count"]).to_csv(output / "deciles.csv")
     stress = {}
     for multiplier in (1, 2, 3, 5, 10):
+        progress("cost_stress", multiplier=multiplier)
         stressed, _ = simulate(
             signals=canonical(test.prediction),
             **{
@@ -441,6 +472,15 @@ def run(
             "p_value": (1 + sum(x >= total for x in null_returns)) / (null_draws + 1),
         },
         "multiple_model_check": multiple_model_check(model_frames, block=max(5, horizon)),
+        "execution_constraints": {
+            "totals": {
+                column: float(portfolio[column].sum())
+                for column in portfolio.columns
+                if column.startswith("buy_")
+                or column in ("filtered_liquidity", "filtered_untradable", "eligible_without_signal")
+            },
+            "note": "Unfilled buy value attributed sequentially to turnover, participation, then cash/fees. Filter counts are candidate-session counts, not currency or proof of causality. Weekly/monthly partial buys are retried only on a later scheduled rebalance; positions are not automatically topped up each intervening day.",
+        },
         "fold_dispersion": fold_dispersion(fold_results),
         "momentum_net_return": float(momentum.equity.iloc[-1] / capital - 1),
         "monthly_momentum_net_return": float(slow_momentum.equity.iloc[-1] / capital - 1),
@@ -484,6 +524,12 @@ def run(
             "status": "completed",
             "schema_version": 2,
             "statistics": statistics,
+            "cost_coverage": fee_coverage,
+            "resource_budget": {
+                "timeout_seconds": wall_clock_budget,
+                "max_historical_instruments": profile.max_instruments,
+                "max_rows": profile.max_rows,
+            },
             "data_quality": quality_panel(df, calendar),
             "research_validity": validity_panel(
                 synthetic, membership, assume_membership_known, evaluation, statistics
@@ -531,7 +577,9 @@ def run(
                 if membership
                 else "Fixed supplied universe; NOT survivorship-bias-free",
                 "Fees use the selected cost model; no price-band checks; square-root impact is an illustrative model",
-                "India delivery schedule estimates or explicit proportional fees; verify broker contract notes",
+                "Pre-coverage proportional bridge used; historical statutory fees are not reconstructed"
+                if "proportional_bridge" in fee_coverage["valuation_sessions"]
+                else "India delivery schedule estimates or explicit proportional fees; verify broker contract notes",
                 "Final close liquidation includes fees and impact; unresolved positions require explicit writeoff or fail",
                 "Benchmark is supplied price-return series unless user supplies a documented total-return series",
                 f"Label uses {horizon} sessions after next-open entry; portfolio is marked daily to close and holds persistent positions",
@@ -543,6 +591,15 @@ def run(
             ],
         }
     )
+    if "proportional_bridge" in fee_coverage["valuation_sessions"]:
+        manifest["research_validity"]["flags"].append(
+            {
+                "severity": "WARNING",
+                "code": "COST_COVERAGE_BRIDGE",
+                "message": "Pre-coverage executions use explicit proportional assumptions; see cost coverage dates/rates",
+            }
+        )
+    progress("reports")
     render(manifest, portfolio, output / "report.html")
     brief = {
         k: manifest[k]
@@ -559,4 +616,5 @@ def run(
         raise ValueError("Brief budget exceeded")
     (output / "brief.json").write_text(text, encoding="utf-8")
     manifest_path.write_text(json.dumps(manifest, indent=2, allow_nan=False), encoding="utf-8")
+    progress("completed")
     return manifest
