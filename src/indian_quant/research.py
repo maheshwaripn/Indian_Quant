@@ -347,8 +347,9 @@ def run(
     start = calendar[calendar.get_loc(test_dates[0]) + 1]
     end = calendar[calendar.get_loc(test_dates[-1]) + 1]
     dates = calendar[(calendar >= start) & (calendar <= end)]
-    from .execution import prepare_market, simulate
-    from .statistics import hac_t, ic_series, interval, multiple_model_check
+    from .execution import DEPLOYMENT_TARGET, prepare_market, simulate
+    from .statistics import hac_t, ic_series, interval, multiple_model_check, paired_return_interval
+    from .trade_audit import exposure_warning, round_trips, summarize
 
     # Qlib normalizes instrument identifiers to lowercase; source symbols are canonical uppercase.
     def canonical(signal):
@@ -386,6 +387,11 @@ def run(
     portfolio, fills = simulate(signals=canonical(test.prediction), **execution)
     portfolio.to_csv(output / "portfolio.csv")
     fills.to_csv(output / "fills.csv", index=False)
+    trades = round_trips(fills)
+    trades.to_csv(output / "trades.csv", index=False)
+    trade_summary = summarize(trades)
+    if not np.isclose(trade_summary["net_pnl"], portfolio.equity.iloc[-1] - capital, rtol=1e-9, atol=1e-5):
+        raise ValueError("Trade P&L does not reconcile with final portfolio equity")
     progress("equal_weight_baseline")
     baseline, _ = simulate(signals=canonical(test.prediction), equal_weight=True, **execution)
     baseline.to_csv(output / "equal_weight.csv")
@@ -461,7 +467,19 @@ def run(
         "sum_daily_cost_ratios": float(portfolio.cost.sum()),
         "test_sessions": len(net),
     }
+    comparison = paired_return_interval(net, baseline["return"] - baseline.cost, block=max(5, horizon))
+    deployment_warning = exposure_warning(portfolio, DEPLOYMENT_TARGET)
     statistics = {
+        "selected_minus_equal_weight": comparison,
+        "trade_summary": trade_summary,
+        "deployment_target": DEPLOYMENT_TARGET,
+        "signal_availability": {
+            "yearly_eligible_without_signal": {
+                str(year): int(part.eligible_without_signal.sum())
+                for year, part in portfolio.groupby(portfolio.index.year)
+            },
+            "note": "Counted on rebalance sessions: execution-date members lacking a non-null score from the preceding session. Causes can include feature warmup/missing required inputs, membership becoming effective after the signal date, or no prediction on that date. This count alone does not identify the cause; it is not a count of unique stocks or missing future labels.",
+        },
         "net_return_interval": interval(net, block=max(5, horizon)),
         "rank_ic_hac_t": hac_t(daily_ic, lag=max(5, horizon)),
         "label_coverage": float(test.label.notna().mean()),
@@ -599,6 +617,8 @@ def run(
                 "message": "Pre-coverage executions use explicit proportional assumptions; see cost coverage dates/rates",
             }
         )
+    if deployment_warning:
+        manifest["research_validity"]["flags"].append(deployment_warning)
     progress("reports")
     render(manifest, portfolio, output / "report.html")
     brief = {
@@ -610,8 +630,10 @@ def run(
         "return_interval": statistics["net_return_interval"],
         "shuffle_p": statistics["shuffled_signal"]["p_value"],
     }
+    brief["equal_weight_comparison"] = {k: comparison[k] for k in ("difference", "low", "high")}
+    brief["warnings"] = [deployment_warning["message"]] if deployment_warning else []
     brief["research_status"] = manifest["research_validity"]["status"]
-    text = json.dumps(brief, indent=2, allow_nan=False)
+    text = json.dumps(brief, separators=(",", ":"), allow_nan=False)
     if len(text) > profile.brief_chars:
         raise ValueError("Brief budget exceeded")
     (output / "brief.json").write_text(text, encoding="utf-8")

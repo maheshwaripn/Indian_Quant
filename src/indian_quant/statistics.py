@@ -77,3 +77,30 @@ def multiple_model_check(frames, draws=199, seed=31, block=5):
         "draws": draws,
         "method": "One-sided block sign-flip max HAC-t of daily rank IC; assumes block sign symmetry; covers only these models",
     }
+
+
+def paired_return_interval(strategy, baseline, samples=500, block=5, seed=43):
+    """Resample matched dates together; difference of compounded returns, not compounded spread."""
+    if not strategy.index.equals(baseline.index):
+        raise ValueError("Paired return dates must match exactly")
+    values = np.column_stack([strategy.to_numpy(), baseline.to_numpy()])
+    if len(values) < 2 or not np.isfinite(values).all():
+        raise ValueError("Paired interval requires at least two finite matched sessions")
+    rng = np.random.default_rng(seed)
+    estimates = []
+    for _ in range(samples):
+        starts = rng.integers(0, len(values), size=int(np.ceil(len(values) / block)))
+        ix = np.concatenate([(start + np.arange(block)) % len(values) for start in starts])[: len(values)]
+        returns = np.prod(1 + values[ix], axis=0) - 1
+        estimates.append(returns[0] - returns[1])
+    point = np.prod(1 + values, axis=0) - 1
+    low, high = np.quantile(estimates, [0.025, 0.975])
+    return {
+        "difference": float(point[0] - point[1]),
+        "low": float(low),
+        "high": float(high),
+        "samples": samples,
+        "block_sessions": block,
+        "seed": seed,
+        "method": "95% paired circular moving-block percentile interval of total net return difference; conditional on observed paths, not refitted models",
+    }

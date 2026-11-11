@@ -12,6 +12,8 @@ import pandas as pd
 
 from .cost_policy import cost_regime
 
+DEPLOYMENT_TARGET = 0.95
+
 Quote = namedtuple("Quote", "open close volume")
 
 
@@ -106,6 +108,7 @@ def simulate(
     all_dates = market.calendar
     by_day = {d: g.droplevel("datetime") for d, g in signals.groupby(level="datetime")}
     cash, positions, marks = float(capital), {}, {}
+    trade_ids, next_trade = {}, 0
     previous, last_period, rows, fills = float(capital), None, [], []
     for i, day in enumerate(dates):
         quote = {s: Quote(*values) for s, values in zip(market.symbols, market.quotes[i])}
@@ -151,7 +154,7 @@ def simulate(
             count = len(ranked) if equal_weight else topk
             keep = [s for s in positions if s in ranked[: count + hold_buffer]]
             chosen = (keep + [s for s in ranked if s not in keep])[:count]
-            targets = {s: 0.95 * open_equity / len(chosen) for s in chosen} if chosen else {}
+            targets = {s: DEPLOYMENT_TARGET * open_equity / len(chosen) for s in chosen} if chosen else {}
             last_period = period
         else:
             targets = {s: q * (quote[s].open if s in tradable else marks[s]) for s, q in positions.items()}
@@ -211,6 +214,9 @@ def simulate(
                 if value < 1e-8:
                     continue
                 fee = charges(day, side, execution)
+                if side == "buy" and s not in positions:
+                    next_trade += 1
+                    trade_ids[s] = f"T{next_trade:08d}"
                 positions[s] = positions.get(s, 0.0) + (units if side == "buy" else -units)
                 cash += -execution - fee if side == "buy" else execution - fee
                 marks[s] = px
@@ -227,6 +233,11 @@ def simulate(
                         "side": side,
                         "value": execution,
                         "fee": fee,
+                        "price": execution / units,
+                        "quantity": units,
+                        "impact": value * slip,
+                        "position_after": positions.get(s, 0.0),
+                        "trade_id": trade_ids[s],
                         "reason": "rebalance",
                         "cost_regime": cost_regime(day, cost_model, cost_before_coverage),
                     }
@@ -240,12 +251,33 @@ def simulate(
         writeoff = 0.0
         if i == len(dates) - 1:
             for s, units in list(positions.items()):
+
+                def record_writeoff(day=day, s=s, units=units):
+                    fills.append(
+                        {
+                            "date": str(day.date()),
+                            "symbol": s,
+                            "side": "writeoff",
+                            "value": 0.0,
+                            "fee": 0.0,
+                            "price": 0.0,
+                            "quantity": units,
+                            "impact": 0.0,
+                            "position_after": 0.0,
+                            "trade_id": trade_ids[s],
+                            "reason": "terminal_writeoff",
+                            "cost_regime": "not_applicable",
+                            "writeoff_value": units * marks[s],
+                        }
+                    )
+
                 if s in stale:
                     if terminal_policy == "error":
                         raise ValueError(
                             f"Unresolved terminal holding {s}; supply settlement data or explicitly choose writeoff"
                         )
                     writeoff += units * marks[s]
+                    record_writeoff()
                 else:
                     value = units * marks[s]
                     liquidity = adv[s]
@@ -253,6 +285,7 @@ def simulate(
                         if terminal_policy == "error":
                             raise ValueError(f"Terminal liquidation exceeds capacity for {s}")
                         writeoff += value
+                        record_writeoff()
                         del positions[s]
                         continue
                     slip = impact_bps / 10000 * np.sqrt(value / liquidity)
@@ -269,6 +302,11 @@ def simulate(
                             "side": "sell",
                             "value": execution,
                             "fee": fee,
+                            "price": execution / units,
+                            "quantity": units,
+                            "impact": value * slip,
+                            "position_after": 0.0,
+                            "trade_id": trade_ids[s],
                             "reason": "terminal_close",
                             "cost_regime": cost_regime(day, cost_model, cost_before_coverage),
                         }
@@ -303,4 +341,19 @@ def simulate(
         previous = equity
     frame = pd.DataFrame(rows).set_index("date")
     frame["bench"] = market.benchmark_returns
-    return frame, pd.DataFrame(fills)
+    columns = [
+        "date",
+        "symbol",
+        "side",
+        "value",
+        "fee",
+        "reason",
+        "cost_regime",
+        "price",
+        "quantity",
+        "impact",
+        "position_after",
+        "trade_id",
+        "writeoff_value",
+    ]
+    return frame, pd.DataFrame(fills).reindex(columns=columns).fillna({"writeoff_value": 0.0})

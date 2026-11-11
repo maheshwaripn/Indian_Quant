@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "indian-quant"
-version = "0.2.2"
+version = "0.2.3"
 description = "CPU-first, reproducible Indian equity research with Qlib and optional AI guidance"
 readme = "README.md"
 requires-python = ">=3.11,<3.14"

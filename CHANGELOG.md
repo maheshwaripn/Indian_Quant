@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.3 — 2026-11-11
+
+Address issue #2: deployment shortfall warnings in reports and compact briefs; fill quantities, impact-adjusted prices, position balances and holding IDs; reconciled round-trip trades including explicit terminal writeoffs; yearly missing-signal counts; headline equal-weight excess return with a paired block interval. Add ten regression cases. Trading rules and portfolio sizing are unchanged.
+
 ## 0.2.2 — 2026-11-10
 
 Address issue #1: explicit pre-coverage proportional fee bridge, lab historical universe cap of 2,000, custom membership-audit size, optional MLflow hint suppression, bounded timeout override, persistent progress, reusable price/liquidity arrays, and purchase-constraint reporting. Add nine regression tests. Preserve existing execution rules and historical tax coverage boundaries.

@@ -34,6 +34,19 @@ def render(manifest, portfolio, path):
         )
         lines.append(f'<polyline points="{points}" fill="none" stroke="{color}" stroke-width="2"/>')
     stats = manifest.get("statistics", {})
+    comparison = stats.get("selected_minus_equal_weight", {})
+    if comparison:
+        headline = (
+            f"<h2>Net return versus equal weight</h2><p>Strategy: {manifest['metrics']['total_return_net']:.2%}; "
+            f"equal-weight eligible portfolio: {stats['equal_weight_net_return']:.2%}. "
+            f"Difference: {100 * comparison['difference']:+.2f} percentage points "
+            f"(95% paired block interval: {100 * comparison['low']:+.2f} to {100 * comparison['high']:+.2f} pp).</p>"
+            "<p>Matched-date resampling of compounded net returns; conditional on observed paths, not a forecast or a refit of models. Equal weight uses the same eligibility, costs and execution constraints.</p>"
+        )
+    else:
+        headline = ""
+    trade_panel = escape(json.dumps(stats.get("trade_summary", {}), indent=2))
+    signal_panel = escape(json.dumps(stats.get("signal_availability", {}), indent=2))
     intervals = stats.get("net_return_interval", {}).get("metric_intervals", {})
     rows = ""
     for key, value in manifest["metrics"].items():
@@ -115,6 +128,7 @@ pre{{white-space:pre-wrap;overflow-wrap:anywhere}}.card{{background:#fff;padding
 <div class="card"><h2>Out-of-sample equity</h2><p>Blue: strategy after configured costs. Gold: supplied benchmark.
 Both start at 1. Vertical range: {low:.3f}–{high:.3f}. Horizontal axis: test sessions in chronological order.</p>
 <svg viewBox="0 0 800 260" role="img" aria-label="Strategy and benchmark compounded equity">{"".join(lines)}</svg></div>
+{headline}
 <h2>Performance and interpretation</h2><table><tr><th>Metric</th><th>Value (ratios)</th><th>95% block interval</th><th>How to read it</th></tr>{rows}</table>
 <div class="card"><h2>Model comparison</h2><p>Last fold model, selected on validation rank IC: {escape(manifest["selected_model"])}.
 Rank IC measures ordering skill, not net profitability. Test results must not be used for repeated tuning.</p>
@@ -133,6 +147,8 @@ quintile spread in folds.json is gross and not an executable long-short return. 
 A 60% positive-IC screen alone cannot establish candidate status; independent regime evidence is unavailable.</p>
 <h2>Year-by-year net performance</h2><table><tr><th>Year</th><th>Net return</th></tr>{yearly}</table>
 <h2>Ordering skill and exposure over time</h2>{charts}
+<h2>Closed holding episodes</h2><pre>{trade_panel}</pre><p>Read trades.csv for entry/exit dates, calendar holding days and net P&amp;L including all fees. Writeoffs are closures without sale proceeds. Fill prices include impact; do not subtract impact again.</p>
+<h2>Missing signals by test year</h2><pre>{signal_panel}</pre>
 <h2>What constrained purchases?</h2><pre>{constraints}</pre>
 <h2>Fee coverage and explicit bridges</h2><pre>{fee_coverage}</pre>
 <h2>Gross forward returns by predicted decile</h2>{decile_table}

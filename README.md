@@ -128,3 +128,7 @@ Code: [MIT licence](LICENSE). Qlib is an upstream dependency with its own licenc
 ### Real-data workflow fixes (0.2.2)
 
 Historical cost bridges, custom index-size audits, larger historical universes, explicit timeout overrides, progress files and purchase-constraint diagnostics are described in [issue #1 resolution](docs/issue-1-resolution.md). Portfolio trials reuse prepared market arrays to reduce repeated work; trading rules are unchanged.
+
+### Trade audit and comparative reporting (0.2.3)
+
+Reports and compact briefs now flag low deployment and show net return minus the eligible equal-weight portfolio with a paired interval. Auditable fills feed reconciled holding episodes in `trades.csv`; missing scores are counted by year. See [issue #2 resolution](docs/issue-2-resolution.md).
